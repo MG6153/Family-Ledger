@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Family Ledger</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f172a; color: #f1f5f9; min-height: 100vh; }
+  .app { max-width: 430px; margin: 0 auto; }
+  .header { padding: 16px 20px; background: #0f172a; border-bottom: 1px solid #1e293b; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 10; }
+  .header-title { font-size: 18px; font-weight: 700; letter-spacing: -0.3px; }
+  .sync-badge { font-size: 11px; color: #64748b; background: #1e293b; padding: 2px 10px; border-radius: 20px; }
+  .sync-badge.ok { color: #34d399; }
+  .sync-badge.err { color: #f87171; }
+  .page { padding: 20px 16px 60px; display: none; }
+  .page.active { display: block; }
+  .balance-card { border-radius: 20px; padding: 28px 24px; margin-bottom: 24px; box-shadow: 0 8px 32px rgba(0,0,0,0.4); background: linear-gradient(135deg,#1e3a5f,#1e40af); }
+  .balance-card.negative { background: linear-gradient(135deg,#7f1d1d,#991b1b); }
+  .balance-label { font-size: 13px; color: rgba(255,255,255,0.65); letter-spacing: 0.5px; text-transform: uppercase; }
+  .balance-amount { font-size: 44px; font-weight: 800; letter-spacing: -1px; margin-top: 6px; }
+  .balance-sub { font-size: 13px; color: rgba(255,255,255,0.6); margin-top: 8px; }
+  .progress-track { height: 4px; background: rgba(255,255,255,0.15); border-radius: 4px; margin-top: 16px; }
+  .progress-fill { height: 100%; border-radius: 4px; background: #34d399; transition: width 0.5s ease; }
+  .progress-fill.danger { background: #f87171; }
+  .section-label { font-size: 12px; font-weight: 700; color: #64748b; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 10px; }
+  .empty { color: #475569; text-align: center; padding: 32px 0; font-size: 15px; }
+  .expense-row { display: flex; align-items: center; gap: 12px; padding: 14px 0; border-bottom: 1px solid #1e293b; }
+  .expense-cat { font-size: 26px; width: 36px; text-align: center; flex-shrink: 0; }
+  .expense-desc { font-size: 15px; font-weight: 500; color: #f1f5f9; }
+  .expense-meta { font-size: 12px; color: #64748b; margin-top: 2px; }
+  .expense-amt { font-size: 15px; font-weight: 700; color: #f87171; flex-shrink: 0; margin-left: auto; }
+  .expense-del { background: transparent; border: none; color: #475569; cursor: pointer; font-size: 14px; padding: 4px 6px; margin-left: 6px; }
+  .actions { display: flex; gap: 10px; margin-top: 28px; }
+  .btn-primary { flex: 1; padding: 14px; background: #2563eb; color: #fff; border: none; border-radius: 14px; font-size: 16px; font-weight: 700; cursor: pointer; }
+  .btn-secondary { flex: 1; padding: 14px; background: #1e293b; color: #94a3b8; border: 1px solid #334155; border-radius: 14px; font-size: 15px; font-weight: 600; cursor: pointer; }
+  .btn-danger { padding: 12px 20px; background: #7f1d1d; color: #fca5a5; border: 1px solid #991b1b; border-radius: 12px; font-size: 14px; font-weight: 600; cursor: pointer; }
+  .btn-link { display: block; width: 100%; text-align: center; background: transparent; border: none; color: #3b82f6; font-size: 14px; font-weight: 600; cursor: pointer; padding: 12px 0; margin-top: 8px; }
+  .btn-back { background: transparent; border: none; color: #3b82f6; font-size: 15px; cursor: pointer; padding: 0 0 16px; font-weight: 600; }
+  .btn-full { width: 100%; padding: 14px; background: #2563eb; color: #fff; border: none; border-radius: 14px; font-size: 16px; font-weight: 700; cursor: pointer; margin-top: 16px; }
+  .page-title { font-size: 24px; font-weight: 800; margin: 0 0 20px; letter-spacing: -0.5px; }
+  label.field-label { display: block; font-size: 13px; font-weight: 600; color: #94a3b8; margin-bottom: 6px; margin-top: 16px; }
+  input[type=number], input[type=text] { width: 100%; padding: 14px; background: #1e293b; border: 1px solid #334155; border-radius: 12px; color: #f1f5f9; font-size: 17px; outline: none; }
+  input.big { font-size: 28px; font-weight: 700; text-align: center; }
+  .chip-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+  .chip { padding: 8px 14px; background: #1e293b; border: 1px solid #334155; border-radius: 20px; color: #94a3b8; font-size: 13px; cursor: pointer; font-weight: 500; }
+  .chip.active { background: #1d4ed8; border-color: #2563eb; color: #fff; }
+  .hint { color: #64748b; font-size: 14px; line-height: 1.5; margin: 0 0 16px; }
+  .preview { color: #34d399; text-align: center; margin-top: 8px; font-size: 14px; }
+  .danger-zone { margin-top: 40px; border-top: 1px solid #1e293b; padding-top: 20px; }
+  .danger-label { color: #ef4444; font-size: 14px; margin-bottom: 12px; }
+  .confirm-text { color: #f87171; font-size: 14px; margin-bottom: 12px; }
+  .confirm-row { display: flex; gap: 10px; }
+  .toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); padding: 10px 20px; border-radius: 20px; font-size: 14px; font-weight: 600; color: #fff; z-index: 100; box-shadow: 0 4px 20px rgba(0,0,0,0.4); white-space: nowrap; opacity: 0; transition: opacity 0.2s; pointer-events: none; }
+  .toast.show { opacity: 1; }
+  .toast.success { background: #10b981; }
+  .toast.error { background: #ef4444; }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <span class="header-title">Family Ledger</span>
+    <span class="sync-badge" id="syncBadge">Loading…</span>
+  </div>
+  <div class="page active" id="pageHome">
+    <div class="balance-card" id="balanceCard">
+      <p class="balance-label">Available Balance</p>
+      <p class="balance-amount" id="balanceAmount">$0.00</p>
+      <div id="progressWrap" style="display:none">
+        <div class="progress-track"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+        <p class="balance-sub" id="balanceSub"></p>
+      </div>
+    </div>
+    <p class="section-label">Recent Expenses</p>
+    <div id="recentList"><div class="empty">No expenses yet — tap Set Balance first</div></div>
+    <div class="actions">
+      <button class="btn-primary" onclick="showPage('pageAdd')">+ Add Expense</button>
+      <button class="btn-secondary" onclick="showPage('pageSetBalance')">Set Balance</button>
+    </div>
+    <button class="btn-link" id="viewAllBtn" style="display:none" onclick="showPage('pageHistory')">View History</button>
+  </div>
+  <div class="page" id="pageAdd">
+    <button class="btn-back" onclick="showPage('pageHome')">← Back</button>
+    <h2 class="page-title">Add Expense</h2>
+    <label class="field-label">Amount ($)</label>
+    <input type="number" inputmode="decimal" placeholder="0.00" id="expAmount">
+    <label class="field-label">Description</label>
+    <input type="text" placeholder="What was this for?" id="expDesc">
+    <label class="field-label">Category</label>
+    <div class="chip-row" id="catChips"></div>
+    <label class="field-label">Who's paying?</label>
+    <div class="chip-row">
+      <button class="chip active" id="whoMe" onclick="selectWho('Me')">Me</button>
+      <button class="chip" id="whoWife" onclick="selectWho('My Wife')">My Wife</button>
+    </div>
+    <button class="btn-full" onclick="addExpense()">Deduct Expense</button>
+  </div>
+  <div class="page" id="pageSetBalance">
+    <button class="btn-back" onclick="showPage('pageHome')">← Back</button>
+    <h2 class="page-title">Set Weekly Balance</h2>
+    <p class="hint" id="currentBalHint"></p>
+    <label class="field-label">New Balance ($)</label>
+    <input type="number" inputmode="decimal" placeholder="e.g. 500" class="big" id="newBalInput" oninput="previewBal()">
+    <p class="preview" id="balPreview"></p>
+    <button class="btn-full" onclick="setBalance()">Save Balance</button>
+    <div class="danger-zone">
+      <p class="danger-label">Danger Zone</p>
+      <div id="resetArea"><button class="btn-danger" onclick="showConfirmReset()">Clear All Data</button></div>
+      <div id="resetConfirm" style="display:none">
+        <p class="confirm-text">This deletes all expenses and resets the balance.</p>
+        <div class="confirm-row">
+          <button class="btn-danger" onclick="resetAll()">Yes, Clear Everything</button>
+          <button class="btn-secondary" onclick="hideConfirmReset()">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="page" id="pageHistory">
+    <button class="btn-back" onclick="showPage('pageHome')">← Back</button>
+    <h2 class="page-title">All Expenses</h2>
+    <div id="historyList"></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+const API_KEY = "$2a$10$vT6dal/bZThBRWRykvtxXOsszSNQ8EOu/b1jSgvpaG6vVkI1d61oK";
+const BIN_NAME = "family-ledger";
+let BIN_ID = localStorage.getItem("jsonbin-id") || null;
+let ledger = { balance: 0, weeklyBudget: 0, expenses: [] };
+let selectedCat = "📦 Other";
+let selectedWho = "Me";
+const CATEGORIES = ["🛒 Groceries","🍽️ Dining","⛽ Gas","🏠 Home","🏥 Health","👕 Clothing","🎉 Fun","📦 Other"];
+function fmt(n) { return new Intl.NumberFormat("en-US",{style:"currency",currency:"USD"}).format(parseFloat(n)||0); }
+function fmtDate(iso) { return new Date(iso).toLocaleDateString("en-US",{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}); }
+async function loadLedger() {
+  setSyncBadge("Syncing…","");
+  try {
+    if (!BIN_ID) {
+      const res = await fetch("https://api.jsonbin.io/v3/b", {
+        method: "POST",
+        headers: { "Content-Type":"application/json", "X-Master-Key": API_KEY, "X-Bin-Name": BIN_NAME, "X-Bin-Private": "true" },
+        body: JSON.stringify({ balance:0, weeklyBudget:0, expenses:[] })
+      });
+      const data = await res.json();
+      if (data.metadata && data.metadata.id) {
+        BIN_ID = data.metadata.id;
+        localStorage.setItem("jsonbin-id", BIN_ID);
+        ledger = data.record;
+        setSyncBadge("Ready ✓","ok");
+      } else { throw new Error(JSON.stringify(data)); }
+    } else {
+      const res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, { headers: { "X-Master-Key": API_KEY } });
+      const data = await res.json();
+      if (data.record) { ledger = data.record; setSyncBadge("Synced ✓","ok"); }
+      else { throw new Error(JSON.stringify(data)); }
+    }
+  } catch(e) { setSyncBadge("Sync error","err"); console.error(e); }
+  renderHome();
+}
+async function saveLedger() {
+  if (!BIN_ID) return false;
+  setSyncBadge("Saving…","");
+  try {
+    const res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
+      method: "PUT",
+      headers: { "Content-Type":"application/json", "X-Master-Key": API_KEY },
+      body: JSON.stringify(ledger)
+    });
+    const data = await res.json();
+    if (data.record) { setSyncBadge("Saved ✓","ok"); return true; }
+    else { throw new Error(JSON.stringify(data)); }
+  } catch(e) { setSyncBadge("Save error","err"); showToast("Save failed","error"); return false; }
+}
+function renderHome() {
+  const bal = ledger.balance, budget = ledger.weeklyBudget;
+  document.getElementById("balanceAmount").textContent = fmt(bal);
+  document.getElementById("balanceCard").className = "balance-card" + (bal < 0 ? " negative" : "");
+  const pw = document.getElementById("progressWrap");
+  if (budget > 0) {
+    const pct = Math.min(100, ((budget-bal)/budget)*100);
+    pw.style.display = "block";
+    const fill = document.getElementById("progressFill");
+    fill.style.width = pct+"%";
+    fill.className = "progress-fill"+(pct>85?" danger":"");
+    document.getElementById("balanceSub").textContent = `${fmt(budget-bal)} spent of ${fmt(budget)} budget`;
+  } else { pw.style.display = "none"; }
+  const expenses = ledger.expenses||[];
+  const list = document.getElementById("recentList");
+  list.innerHTML = expenses.length===0 ? '<div class="empty">No expenses yet — tap Set Balance first</div>'
+    : expenses.slice(0,5).map(e=>`<div class="expense-row"><div class="expense-cat">${e.category.split(" ")[0]}</div><div style="flex:1"><div class="expense-desc">${e.description}</div><div class="expense-meta">${e.who} · ${fmtDate(e.date)}</div></div><div class="expense-amt">−${fmt(e.amount)}</div></div>`).join("");
+  const va = document.getElementById("viewAllBtn");
+  va.style.display = expenses.length>5?"block":"none";
+  if(expenses.length>5) va.textContent=`View all ${expenses.length} expenses →`;
+  document.getElementById("currentBalHint").textContent=`Current balance: ${fmt(bal)}`;
+}
+function renderHistory() {
+  const expenses = ledger.expenses||[];
+  document.getElementById("historyList").innerHTML = expenses.length===0 ? '<div class="empty">No expenses yet</div>'
+    : expenses.map(e=>`<div class="expense-row"><div class="expense-cat">${e.category.split(" ")[0]}</div><div style="flex:1"><div class="expense-desc">${e.description}</div><div class="expense-meta">${e.category.slice(2)} · ${e.who} · ${fmtDate(e.date)}</div></div><div class="expense-amt">−${fmt(e.amount)}</div><button class="expense-del" onclick="deleteExpense(${e.id})">✕</button></div>`).join("");
+}
+function buildCatChips() {
+  document.getElementById("catChips").innerHTML = CATEGORIES.map(cat=>`<button class="chip${cat===selectedCat?" active":""}" onclick="selectCat('${cat}')">${cat}</button>`).join("");
+}
+function selectCat(cat) { selectedCat=cat; buildCatChips(); }
+function selectWho(who) {
+  selectedWho=who;
+  document.getElementById("whoMe").className="chip"+(who==="Me"?" active":"");
+  document.getElementById("whoWife").className="chip"+(who==="My Wife"?" active":"");
+}
+async function addExpense() {
+  const amount=parseFloat(document.getElementById("expAmount").value);
+  const desc=document.getElementById("expDesc").value.trim();
+  if(!amount||amount<=0||!desc){showToast("Enter a valid amount and description","error");return;}
+  ledger.balance=(ledger.balance||0)-amount;
+  ledger.expenses=[{id:Date.now(),amount,description:desc,category:selectedCat,who:selectedWho,date:new Date().toISOString()},...(ledger.expenses||[])];
+  const ok=await saveLedger();
+  if(ok){document.getElementById("expAmount").value="";document.getElementById("expDesc").value="";showToast(`${fmt(amount)} deducted`);showPage("pageHome");}
+}
+async function setBalance() {
+  const raw=document.getElementById("newBalInput").value.trim();
+  if(!raw){showToast("Please enter an amount","error");return;}
+  const val=parseFloat(raw);
+  if(isNaN(val)||val<0){showToast("Enter a valid positive amount","error");return;}
+  ledger.balance=val; ledger.weeklyBudget=val;
+  const ok=await saveLedger();
+  if(ok){document.getElementById("newBalInput").value="";document.getElementById("balPreview").textContent="";showToast(`Balance set to ${fmt(val)}!`);showPage("pageHome");}
+}
+async function deleteExpense(id) {
+  const exp=(ledger.expenses||[]).find(e=>e.id===id);
+  if(!exp)return;
+  ledger.balance=(ledger.balance||0)+exp.amount;
+  ledger.expenses=ledger.expenses.filter(e=>e.id!==id);
+  const ok=await saveLedger();
+  if(ok){showToast("Expense removed");renderHistory();renderHome();}
+}
+async function resetAll() {
+  ledger={balance:0,weeklyBudget:0,expenses:[]};
+  const ok=await saveLedger();
+  if(ok){hideConfirmReset();showToast("Ledger cleared");showPage("pageHome");}
+}
+function previewBal() {
+  const val=parseFloat(document.getElementById("newBalInput").value);
+  document.getElementById("balPreview").textContent=isNaN(val)?"":`Will set balance to ${fmt(val)}`;
+}
+function showPage(id) {
+  document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
+  if(id==="pageAdd")buildCatChips();
+  if(id==="pageHistory")renderHistory();
+  if(id==="pageHome")renderHome();
+  if(id==="pageSetBalance")document.getElementById("currentBalHint").textContent=`Current balance: ${fmt(ledger.balance)}`;
+  window.scrollTo(0,0);
+}
+function showConfirmReset(){document.getElementById("resetArea").style.display="none";document.getElementById("resetConfirm").style.display="block";}
+function hideConfirmReset(){document.getElementById("resetArea").style.display="block";document.getElementById("resetConfirm").style.display="none";}
+function showToast(msg,type="success"){const t=document.getElementById("toast");t.textContent=msg;t.className=`toast show ${type}`;setTimeout(()=>t.classList.remove("show"),3000);}
+function setSyncBadge(text,cls){const b=document.getElementById("syncBadge");b.textContent=text;b.className="sync-badge"+(cls?" "+cls:"");}
+setInterval(loadLedger,20000);
+loadLedger();
+</script>
+</body>
+</html>
